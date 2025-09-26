@@ -13,7 +13,7 @@ This defines the complete orchestration workflow for the AI Agent Factory system
 1. **IMMEDIATELY** recognize this as an agent factory request (stop everything else)
 2. **MUST** follow Phase 0 first - ask clarifying questions
 3. **WAIT** for user responses
-4. **THEN** check Archon and proceed with workflow
+4. **THEN** determine if workflow or isolated agent and proceed accordingly
 
 **Factory Workflow Recognition Patterns** (if user says ANY of these):
 
@@ -24,33 +24,37 @@ This defines the complete orchestration workflow for the AI Agent Factory system
 - "I want to build a Pydantic AI agent..."
 - Any request mentioning agent/AI/LLM + functionality
 
-**MANDATORY Archon Integration (happens AFTER Phase 0):**
+**REQUEST TYPE DETERMINATION (happens AFTER Phase 0):**
 
-1. After getting user clarifications, run `mcp__archon__health_check`
-2. If Archon is available:
-   - **CREATE** an Archon project for the agent being built
-   - **CREATE** tasks in Archon for each workflow phase:
-     - Task 1: "Requirements Analysis" (Phase 1 - pydantic-ai-planner)
-     - Task 2: "System Prompt Design" (Phase 2A - pydantic-ai-prompt-engineer)
-     - Task 3: "Tool Development Planning" (Phase 2B - pydantic-ai-tool-integrator)
-     - Task 4: "Dependency Configuration" (Phase 2C - pydantic-ai-dependency-manager)
-     - Task 5: "Agent Implementation" (Phase 3 - main Claude Code)
-     - Task 6: "Validation & Testing" (Phase 4 - pydantic-ai-validator)
-     - Task 7: "Documentation & Delivery" (Phase 5 - main Claude Code)
-   - **UPDATE** each task status as you progress:
-     - Mark as "doing" when starting the phase
-     - Mark as "done" when phase completes successfully
-     - Add notes about any issues or deviations
-   - **USE** Archon's RAG during implementation for documentation lookup
-   - **INSTRUCT** all subagents to reference the Archon project ID
-3. If Archon is not available: Proceed without it but use TodoWrite for local tracking
+1. After getting user clarifications, analyze request type:
+   - **WORKFLOW INDICATORS**: "multiple agents", "workflow", "pipeline", "orchestration", agents (plural)
+   - **ISOLATED AGENT INDICATORS**: "agent" (singular), single focused task, specific functionality
+
+2. **IF WORKFLOW DETECTED:**
+   - Check current git branch: `git branch --show-current`
+   - **IF ISSUE BRANCH** (contains numbers like issue-123, 123-feature):
+     - Extract issue number from branch name
+     - Run `gh issue view {number}` to get issue details
+     - Search for workflow directory: `find . -name "*workflow*" -type d`
+     - Read WORKFLOW_ARCHITECTURE.md if found
+     - Determine which agent to create based on issue content
+     - Continue to Phase 1 with workflow context
+   - **IF NOT ISSUE BRANCH:**
+     - Call pydantic-ai-workflow-orchestrator
+
+3. **IF ISOLATED AGENT DETECTED:**
+   - Continue directly to Phase 1 (Requirements Documentation)
+   - Use TodoWrite for local progress tracking
 
 **WORKFLOW ENFORCEMENT**: You MUST:
 
 1. Start with Phase 0 (clarifying questions)
 2. Wait for user response before proceeding
-3. Then systematically progress through ALL phases
-4. Never jump directly to implementation
+3. Determine request type (workflow vs isolated agent)
+4. Follow appropriate path:
+   - **WORKFLOW**: Check GitHub branch → Architecture integration OR Orchestrator call
+   - **ISOLATED**: Continue to Phase 1
+5. Never jump directly to implementation
 
 When you want to use or call upon a subagent, you must invoke the subagent, giving them a prompt and passing control to them.
 
@@ -73,39 +77,40 @@ When you want to use or call upon a subagent, you must invoke the subagent, givi
 
 ```
 1. Acknowledge agent creation request
-2. Ask 2-3 targeted clarifying questions (BEFORE invoking planner):
+2. Ask 2-3 targeted clarifying questions (BEFORE determining type):
    - Primary functionality and use case
+   - Single agent or multiple agents working together?
    - Preferred APIs or integrations (if applicable)
-   - Output format preferences
 3. ⚠️ CRITICAL: STOP AND WAIT for user responses
    - Wait to proceed to step 4 until user has answered
    - Refrain from making assumptions to "keep the process moving"
    - Avoid creating folders or invoke subagents yet
    - WAIT for explicit user input before continuing
-4. Only after user responds: DETERMINE AGENT FOLDER NAME (snake_case, e.g., web_search_agent, asana_manager)
-5. Create agents/[AGENT_FOLDER_NAME]/ directory
-6. Invoke ALL subagents with the EXACT SAME folder name
-7. Tell each subagent: "Output to agents/[AGENT_FOLDER_NAME]/"
+4. Only after user responds: ANALYZE REQUEST TYPE
+   - Look for workflow indicators vs isolated agent indicators
+   - Proceed to appropriate workflow path
 ```
 
 ### Phase 1: Requirements Documentation 🎯
 
 **Subagent**: `pydantic-ai-planner`
-**Trigger**: Invoked after Phase 0 clarifications collected
+**Trigger**: Invoked after Phase 0 clarifications and request type determination
 **Mode**: AUTONOMOUS - Works without user interaction
 **Philosophy**: SIMPLE, FOCUSED requirements - MVP mindset
-**Archon**: Update Task 1 to "doing" before invoking subagent
+**Progress**: Use TodoWrite for tracking
 
 ```
 Actions:
-1. Update Archon Task 1 "Requirements Analysis" to status="doing"
-2. Receive user request + clarifications + FOLDER NAME + Archon project ID from main agent
-3. Analyze requirements focusing on CORE functionality only
-4. Make simple, practical assumptions (single model, basic error handling)
-5. Create minimal INITIAL.md with 2-3 core features maximum
-6. Output: agents/[EXACT_FOLDER_NAME]/planning/INITIAL.md
+1. Create TodoWrite entry for "Requirements Analysis" as in_progress
+2. Receive user request + clarifications + workflow context (if applicable)
+3. DETERMINE AGENT FOLDER NAME (snake_case, e.g., web_search_agent, asana_manager)
+4. Create agents/[AGENT_FOLDER_NAME]/ directory
+5. Analyze requirements focusing on CORE functionality only
+6. Make simple, practical assumptions (single model, basic error handling)
+7. Create minimal INITIAL.md with 2-3 core features maximum
+8. Output: agents/[EXACT_FOLDER_NAME]/planning/INITIAL.md
    ⚠️ CRITICAL: Output to planning/ subdirectory
-7. Update Archon Task 1 to status="done" after subagent completes
+9. Mark TodoWrite "Requirements Analysis" as completed
 ```
 
 **Quality Gate**: INITIAL.md must include:
@@ -119,13 +124,13 @@ Actions:
 ### Phase 2: Parallel Component Development ⚡
 
 **Execute SIMULTANEOUSLY** (all three subagents work in parallel):
-**Archon**: Update Tasks 2, 3, 4 to "doing" before parallel invocation
+**Progress**: Create TodoWrite entries for all three components before parallel invocation
 
 **CRITICAL: Use parallel tool invocation:** When invoking multiple subagents, you MUST call all three Task tools in a SINGLE message with multiple tool uses. This ensures true parallel execution.
 
 - ❌ WRONG: Invoke planner, wait for completion, then invoke prompt engineer
 - ✅ RIGHT: Single message with three Task tool invocations
-- Also update all three Archon tasks (2, 3, 4) to "doing" before the parallel invocation
+- Create TodoWrite entries for "System Prompt Design", "Tool Development Planning", and "Dependency Configuration" as in_progress
 
 #### 2A: System Prompt Engineering
 
@@ -140,6 +145,7 @@ Contents:
 - One simple static system prompt (100-300 words)
 - Skip dynamic prompts unless explicitly needed
 - Focus on essential behavior only
+- Mark TodoWrite "System Prompt Design" as completed when done
 ```
 
 #### 2B: Tool Development Planning
@@ -156,6 +162,7 @@ Contents:
 - Simple parameters (1-3 per tool)
 - Basic error handling
 - Single-purpose tools
+- Mark TodoWrite "Tool Development Planning" as completed when done
 ```
 
 #### 2C: Dependency Configuration Planning
@@ -172,6 +179,7 @@ Contents:
 - Single model provider (no fallbacks)
 - Simple dataclass dependencies
 - Minimal Python packages
+- Mark TodoWrite "Dependency Configuration" as completed when done
 ```
 
 **Phase 2 Complete When**: All three subagents report completion
@@ -179,18 +187,18 @@ Contents:
 ### Phase 3: Agent Implementation 🔨
 
 **Actor**: Main Claude Code (not a subagent)
-**Archon**: Update Task 5 to "doing" before starting implementation
+**Progress**: Use TodoWrite to track implementation steps
 
 ```
 Actions:
-1. Update Archon Task 5 "Agent Implementation" to status="doing"
-2. Mark Archon Tasks 2, 3, 4 as "done" (after verifying subagents completed)
+1. Create TodoWrite entry "Agent Implementation" as in_progress
+2. Verify all Phase 2 components completed (mark as done in TodoWrite)
 3. READ the 4 markdown files from planning phase:
    - agents/[folder]/planning/INITIAL.md
    - agents/[folder]/planning/prompts.md
    - agents/[folder]/planning/tools.md
    - agents/[folder]/planning/dependencies.md
-4. Use Archon RAG to search for Pydantic AI patterns and examples as needed
+4. Use WebSearch to find Pydantic AI patterns and examples as needed
 5. IMPLEMENT the actual Python code based on specifications:
    - Convert prompt specs → prompts.py
    - Convert tool specs → tools.py
@@ -199,7 +207,7 @@ Actions:
    - Combine all components into agent.py
    - Wire up dependencies and tools
    - Create main execution file
-7. Update Archon Task 5 to status="done" when implementation completes
+7. Mark TodoWrite "Agent Implementation" as completed
 8. Structure final project:
    agents/[agent_name]/
    ├── agent.py           # Main agent
@@ -219,17 +227,17 @@ Actions:
 **Subagent**: `pydantic-ai-validator`
 **Trigger**: Automatic after implementation
 **Duration**: 3-5 minutes
-**Archon**: Update Task 6 to "doing" before invoking validator
+**Progress**: Use TodoWrite for tracking
 
 ```
 Actions:
-1. Update Archon Task 6 "Validation & Testing" to status="doing"
-2. Invoke validator subagent with agent folder and Archon project ID
+1. Create TodoWrite entry "Validation & Testing" as in_progress
+2. Invoke validator subagent with agent folder path
 3. Create comprehensive test suite
 4. Validate against INITIAL.md requirements
 5. Run tests with TestModel
 6. Generate validation report
-7. Update Archon Task 6 to status="done" after validation completes
+7. Mark TodoWrite "Validation & Testing" as completed
 8. Output: agents/[agent_name]/tests/
    ├── test_agent.py
    ├── test_tools.py
@@ -249,55 +257,52 @@ Actions:
 ### Phase 5: Delivery & Documentation 📦
 
 **Actor**: Main Claude Code
-**Archon**: Update Task 7 to "doing" before final documentation
+**Progress**: Use TodoWrite for final tracking
 **Final Actions**:
 
 ```
-1. Update Archon Task 7 "Documentation & Delivery" to status="doing"
+1. Create TodoWrite entry "Documentation & Delivery" as in_progress
 2. Generate comprehensive README.md
 3. Create usage examples
 4. Document API endpoints (if applicable)
 5. Provide deployment instructions
-6. Update Archon Task 7 to status="done"
-7. Add final notes to Archon project about agent capabilities
-8. Summary report to user with Archon project link
+6. Mark TodoWrite "Documentation & Delivery" as completed
+7. Provide summary report to user with agent location and capabilities
 ```
 
 ---
 
-## 📋 Archon Task Management Protocol
+## 📋 Progress Tracking Protocol
 
-### Task Creation Flow
+### TodoWrite Management
 
-When Archon is available, create all workflow tasks immediately after project creation:
+Use TodoWrite consistently throughout the factory workflow:
 
-```python
-# After creating Archon project
-tasks = [
-    {"title": "Requirements Analysis", "assignee": "pydantic-ai-planner"},
-    {"title": "System Prompt Design", "assignee": "pydantic-ai-prompt-engineer"},
-    {"title": "Tool Development Planning", "assignee": "pydantic-ai-tool-integrator"},
-    {"title": "Dependency Configuration", "assignee": "pydantic-ai-dependency-manager"},
-    {"title": "Agent Implementation", "assignee": "Claude Code"},
-    {"title": "Validation & Testing", "assignee": "pydantic-ai-validator"},
-    {"title": "Documentation & Delivery", "assignee": "Claude Code"}
-]
-# Create all tasks with status="todo" initially
+```
+Standard workflow tasks:
+- "Requirements Analysis" (Phase 1)
+- "System Prompt Design" (Phase 2A)
+- "Tool Development Planning" (Phase 2B)
+- "Dependency Configuration" (Phase 2C)
+- "Agent Implementation" (Phase 3)
+- "Validation & Testing" (Phase 4)
+- "Documentation & Delivery" (Phase 5)
 ```
 
-### Task Status Updates
+### Task Status Management
 
-- Set to "doing" immediately before starting each phase
-- Set to "done" immediately after phase completes successfully
-- Add notes if phase encounters issues or deviations
-- Never have multiple tasks in "doing" status (except during parallel Phase 2)
+- Create TodoWrite entry as "in_progress" when starting each phase
+- Mark as "completed" immediately after phase finishes successfully
+- Add new tasks if issues or additional work discovered
+- Keep only one task "in_progress" at a time (except during parallel Phase 2)
 
 ### Subagent Communication
 
-Always pass the Archon project ID to subagents:
+Pass consistent context to all subagents:
 
-- Include in the prompt: "Use Archon Project ID: [project-id]"
-- Subagents should reference this in their output for traceability
+- Include agent folder name: "Output to agents/[FOLDER_NAME]/"
+- Reference workflow context if applicable
+- Provide clear specifications from planning phase
 
 ## 🎭 Subagent Invocation Rules
 
@@ -444,14 +449,14 @@ When invoking the planner, provide:
 I'll help you build a web search AI agent using the Pydantic AI framework. Let me ask a few quick questions to better understand your needs:
 
 1. What will the agent primarily search for? (general web content, specific domains, research papers, etc.)
-2. Should the agent summarize the results or return raw search data?
-3. Do you have a preference for which search API to use? (Brave, Google, Bing)
+2. Is this a single agent or part of multiple agents working together?
+3. Should the agent summarize the results or return raw search data?
 
 [STOPS HERE AND WAITS FOR USER TO RESPOND]
 
-[After user responds with their answers]
+[After user responds: "It's a single agent for general web content with summaries"]
 
-Perfect! Based on your requirements [summarize their answers], I'll now invoke our requirements planner to create a comprehensive specification for your web search agent.
+Perfect! I can see this is an isolated agent request (single agent, specific task). I'll now proceed with creating your web search agent.
 
 📋 Creating Requirements Document...
 [Invokes pydantic-ai-planner with context]
@@ -481,18 +486,76 @@ Your web search agent is ready at: agents/web_search_agent/
 I'll create a PostgreSQL query agent with explanation capabilities. Let me ask a few quick questions first:
 
 1. What types of queries will this agent need to run? (SELECT only, or also INSERT/UPDATE/DELETE?)
-2. Should it connect to a specific database or handle multiple database connections?
+2. Is this a single agent or part of multiple agents in a workflow?
 3. How detailed should the explanations be? (brief summaries or detailed analysis?)
 
 [STOPS HERE AND WAITS FOR USER TO RESPOND]
 
-[After user responds with their answers]
+[After user responds: "SELECT queries only, single agent, detailed analysis"]
 
-Great! Based on your requirements [summarize their answers], I'll now create a comprehensive requirements document for your PostgreSQL agent.
+Great! I can see this is an isolated agent request. I'll now create a comprehensive requirements document for your PostgreSQL agent.
 
 📋 Creating Requirements Document...
 [Invokes pydantic-ai-planner with context]
 [Process continues autonomously]
+```
+
+### Example 3: Workflow Detection
+
+**User**: "I want to build multiple AI agents that work together - one for data collection, one for analysis, and one for reporting"
+
+**Claude Code Response**:
+
+```
+I'll help you build a multi-agent workflow system. Let me ask a few questions to understand your needs:
+
+1. How should these agents communicate with each other?
+2. What type of data will be collected and analyzed?
+3. What format should the final reports be in?
+
+[STOPS HERE AND WAITS FOR USER TO RESPOND]
+
+[After user responds with workflow details]
+
+I can see this is a workflow request (multiple agents working together). Let me check your current git branch...
+
+[Runs: git branch --show-current]
+
+I see you're on branch "issue-45-data-pipeline". Let me fetch the issue details...
+
+[Runs: gh issue view 45]
+
+Based on the issue, I need to create the data collection agent first. Let me check for workflow architecture...
+
+[Searches for workflow directory and WORKFLOW_ARCHITECTURE.md]
+
+Found workflow structure! I'll now create the data collection agent as specified in the architecture.
+
+📋 Creating Requirements Document for Data Collection Agent...
+[Process continues with targeted agent creation]
+```
+
+### Example 4: Workflow Without Issue Branch
+
+**User**: "Create a pipeline of agents for customer support automation"
+
+**Claude Code Response**:
+
+```
+I'll help you build a customer support automation pipeline. Let me ask clarifying questions:
+
+1. What channels will receive customer requests?
+2. What types of issues should be automated vs escalated?
+3. How should the agents coordinate responses?
+
+[After user responds]
+
+This is a workflow request, but you're not on an issue branch. I'll call the workflow orchestrator to help design your multi-agent system.
+
+🏭 Calling Workflow Orchestrator...
+[Invokes pydantic-ai-workflow-orchestrator]
+
+[Orchestrator analyzes requirements and creates architecture plan]
 ```
 
 ---

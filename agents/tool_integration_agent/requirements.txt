@@ -1,0 +1,41 @@
+# Core Pydantic AI framework
+pydantic-ai>=0.1.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# LLM Provider
+openai>=1.0.0
+
+# Google API Client Libraries
+google-auth>=2.16.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.100.0
+googleapis-common-protos>=1.60.0
+
+# Database Connectors
+sqlalchemy>=2.0.0
+asyncpg>=0.28.0  # PostgreSQL async driver
+aiosqlite>=0.19.0  # SQLite async driver
+psycopg2-binary>=2.9.0  # PostgreSQL sync driver (fallback)
+
+# HTTP Client and Security
+httpx>=0.25.0
+aiofiles>=23.0.0
+cryptography>=41.0.0
+authlib>=1.2.0  # OAuth 2.0 implementation
+
+# Retry Logic and Error Handling
+tenacity>=8.2.0
+
+# Audit Logging and Monitoring
+structlog>=23.0.0
+python-json-logger>=2.0.0
+
+# Development and Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+black>=23.0.0
+ruff>=0.1.0
